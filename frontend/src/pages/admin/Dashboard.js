@@ -82,7 +82,7 @@ export default function AdminDashboard() {
           ) : (
             <div style={{ maxHeight: 260, overflowY: 'auto' }}>
               {alerts.map(p => (
-                <div key={p._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
                   <div>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>{p.name}</div>
                     <div style={{ fontSize: 12, color: '#6b7280' }}>{p.sku} • {p.category}</div>
@@ -108,7 +108,7 @@ export default function AdminDashboard() {
           ) : (
             <div style={{ maxHeight: 260, overflowY: 'auto' }}>
               {pending.slice(0, 6).map(r => (
-                <div key={r._id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
                   <div>
                     <div style={{ fontWeight: 500, fontSize: 14 }}>{r.product?.name}</div>
                     <div style={{ fontSize: 12, color: '#6b7280' }}>by {r.staff?.username}</div>
