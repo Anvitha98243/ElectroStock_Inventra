@@ -23,7 +23,8 @@ export default function StaffProducts() {
     try {
       const res = await API.get(`/auth/search-admin?username=${adminSearch.trim()}`);
       setFoundAdmin(res.data);
-      const pRes = await API.get(`/products/by-admin/${res.data._id}`);
+      // FIX: use res.data.id instead of res.data._id
+      const pRes = await API.get(`/products/by-admin/${res.data.id}`);
       setProducts(pRes.data);
       toast.success(`Found admin: ${res.data.username}`);
     } catch (err) {
@@ -48,8 +49,9 @@ export default function StaffProducts() {
     setSubmitting(true);
     try {
       await API.post('/requests', {
-        productId: requestModal._id,
-        adminId: foundAdmin._id,
+        // FIX: use .id instead of ._id for both productId and adminId
+        productId: requestModal.id,
+        adminId: foundAdmin.id,
         type: reqForm.type,
         quantity: Number(reqForm.quantity),
         reason: reqForm.reason
@@ -125,7 +127,7 @@ export default function StaffProducts() {
                   {filtered.length === 0 ? (
                     <tr><td colSpan={7}><div className="empty-state"><div className="icon">📦</div><p>No products found</p></div></td></tr>
                   ) : filtered.map(p => (
-                    <tr key={p._id}>
+                    <tr key={p.id}>
                       <td>
                         <div style={{ fontWeight: 500 }}>{p.name}</div>
                         <div style={{ fontSize: 12, color: '#9ca3af' }}>{p.sku}</div>
