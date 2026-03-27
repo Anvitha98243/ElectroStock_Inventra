@@ -143,7 +143,7 @@ export default function AdminLogs() {
               ) : current.map(l => {
                 const meta = ACTION_LABELS[l.action] || { label: l.action, color: 'badge-gray' };
                 return (
-                  <tr key={l._id}>
+                  <tr key={l.id}>
                     <td style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>
                       {new Date(l.createdAt).toLocaleDateString()}<br />
                       <span style={{ color: '#9ca3af' }}>{new Date(l.createdAt).toLocaleTimeString()}</span>
