@@ -23,7 +23,7 @@ export default function AdminRequests() {
   const handleResolve = async (status) => {
     setResolving(true);
     try {
-      await API.put(`/requests/${resolveModal._id}/resolve`, { status, adminNote });
+      await API.put(`/requests/${resolveModal.id}/resolve`, { status, adminNote });
       toast.success(`Request ${status}`);
       setResolveModal(null);
       setAdminNote('');
@@ -78,7 +78,7 @@ export default function AdminRequests() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={8}><div className="empty-state"><div className="icon">📭</div><p>No requests found</p></div></td></tr>
               ) : filtered.map(r => (
-                <tr key={r._id}>
+                <tr key={r.id}>
                   <td>
                     <div style={{ fontWeight: 500 }}>{r.product?.name || 'N/A'}</div>
                     <div style={{ fontSize: 12, color: '#9ca3af' }}>{r.product?.sku}</div>
