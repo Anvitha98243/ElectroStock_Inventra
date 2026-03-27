@@ -12,9 +12,14 @@ import java.util.*;
 @Service
 public class ProductService {
 
-    @Autowired private ProductRepository productRepository;
-    @Autowired private UserRepository userRepository;
-    @Autowired private AuditLogRepository auditLogRepository;
+    @Autowired
+    private ProductRepository productRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private AuditLogRepository auditLogRepository;
+    @Autowired
+    private StockRequestRepository stockRequestRepository;
 
     private User getAdmin(String username) {
         return userRepository.findByUsername(username)
@@ -105,15 +110,24 @@ public class ProductService {
         if (!p.getAdmin().getId().equals(admin.getId()))
             throw new RuntimeException("Access denied");
 
-        if (body.containsKey("name")) p.setName((String) body.get("name"));
-        if (body.containsKey("sku")) p.setSku((String) body.get("sku"));
-        if (body.containsKey("category")) p.setCategory((String) body.get("category"));
-        if (body.containsKey("description")) p.setDescription((String) body.get("description"));
-        if (body.containsKey("quantity")) p.setQuantity(((Number) body.get("quantity")).intValue());
-        if (body.containsKey("minThreshold")) p.setMinThreshold(((Number) body.get("minThreshold")).intValue());
-        if (body.containsKey("price")) p.setPrice(((Number) body.get("price")).doubleValue());
-        if (body.containsKey("supplier")) p.setSupplier((String) body.get("supplier"));
-        if (body.containsKey("location")) p.setLocation((String) body.get("location"));
+        if (body.containsKey("name"))
+            p.setName((String) body.get("name"));
+        if (body.containsKey("sku"))
+            p.setSku((String) body.get("sku"));
+        if (body.containsKey("category"))
+            p.setCategory((String) body.get("category"));
+        if (body.containsKey("description"))
+            p.setDescription((String) body.get("description"));
+        if (body.containsKey("quantity"))
+            p.setQuantity(((Number) body.get("quantity")).intValue());
+        if (body.containsKey("minThreshold"))
+            p.setMinThreshold(((Number) body.get("minThreshold")).intValue());
+        if (body.containsKey("price"))
+            p.setPrice(((Number) body.get("price")).doubleValue());
+        if (body.containsKey("supplier"))
+            p.setSupplier((String) body.get("supplier"));
+        if (body.containsKey("location"))
+            p.setLocation((String) body.get("location"));
         p.setUpdatedAt(LocalDateTime.now());
         productRepository.save(p);
 
@@ -136,6 +150,7 @@ public class ProductService {
         if (!p.getAdmin().getId().equals(admin.getId()))
             throw new RuntimeException("Access denied");
 
+        // Log before deletion
         AuditLog log = new AuditLog();
         log.setAction("PRODUCT_DELETED");
         log.setPerformedBy(admin);
@@ -143,6 +158,10 @@ public class ProductService {
         log.setTargetId(p.getId());
         log.setDetails("{\"name\":\"" + p.getName() + "\",\"sku\":\"" + p.getSku() + "\"}");
         auditLogRepository.save(log);
+
+        // Delete related stock requests first to satisfy FK constraint
+        List<StockRequest> relatedRequests = stockRequestRepository.findByProduct(p);
+        stockRequestRepository.deleteAll(relatedRequests);
 
         productRepository.delete(p);
         return Map.of("message", "Product deleted successfully");

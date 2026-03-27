@@ -21,7 +21,7 @@ public class AuditLog {
     @Column(name = "target_model")
     private String targetModel;
 
-    @Column(name = "target_id")
+    @Column(name = "target.id")
     private Long targetId;
 
     @Column(columnDefinition = "TEXT")
@@ -30,20 +30,62 @@ public class AuditLog {
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public AuditLog() {}
+    public AuditLog() {
+    }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public String getAction() { return action; }
-    public void setAction(String action) { this.action = action; }
-    public User getPerformedBy() { return performedBy; }
-    public void setPerformedBy(User performedBy) { this.performedBy = performedBy; }
-    public String getTargetModel() { return targetModel; }
-    public void setTargetModel(String targetModel) { this.targetModel = targetModel; }
-    public Long getTargetId() { return targetId; }
-    public void setTargetId(Long targetId) { this.targetId = targetId; }
-    public String getDetails() { return details; }
-    public void setDetails(String details) { this.details = details; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getAction() {
+        return action;
+    }
+
+    public void setAction(String action) {
+        this.action = action;
+    }
+
+    public User getPerformedBy() {
+        return performedBy;
+    }
+
+    public void setPerformedBy(User performedBy) {
+        this.performedBy = performedBy;
+    }
+
+    public String getTargetModel() {
+        return targetModel;
+    }
+
+    public void setTargetModel(String targetModel) {
+        this.targetModel = targetModel;
+    }
+
+    public Long getTargetId() {
+        return targetId;
+    }
+
+    public void setTargetId(Long targetId) {
+        this.targetId = targetId;
+    }
+
+    public String getDetails() {
+        return details;
+    }
+
+    public void setDetails(String details) {
+        this.details = details;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }

@@ -84,7 +84,7 @@ export default function StaffDashboard() {
               <thead><tr><th>Product</th><th>Admin</th><th>Type</th><th>Qty</th><th>Status</th><th>Date</th></tr></thead>
               <tbody>
                 {requests.slice(0, 8).map(r => (
-                  <tr key={r._id}>
+                  <tr key={r.id}>
                     <td><div style={{ fontWeight: 500 }}>{r.product?.name}</div><div style={{ fontSize: 12, color: '#9ca3af' }}>{r.product?.sku}</div></td>
                     <td>{r.admin?.username}</td>
                     <td><span className={`badge ${r.type === 'stock-in' ? 'badge-success' : 'badge-warning'}`}>{r.type}</span></td>

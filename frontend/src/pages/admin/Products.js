@@ -47,7 +47,8 @@ export default function AdminProducts() {
     try {
       const payload = { ...form, quantity: Number(form.quantity) || 0, minThreshold: Number(form.minThreshold) || 10, price: Number(form.price) };
       if (editProduct) {
-        await API.put(`/products/${editProduct._id}`, payload);
+        // FIX: use editProduct.id instead of editProduct._id
+        await API.put(`/products/${editProduct.id}`, payload);
         toast.success('Product updated');
       } else {
         await API.post('/products', payload);
@@ -148,7 +149,7 @@ export default function AdminProducts() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={8}><div className="empty-state"><div className="icon">📦</div><p>No products found</p></div></td></tr>
               ) : filtered.map(p => (
-                <tr key={p._id}>
+                <tr key={p.id}>
                   <td>
                     <div style={{ fontWeight: 500 }}>{p.name}</div>
                     {p.supplier && <div style={{ fontSize: 12, color: '#9ca3af' }}>{p.supplier}</div>}
@@ -166,6 +167,7 @@ export default function AdminProducts() {
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-outline btn-sm" onClick={() => openEdit(p)}>✏️ Edit</button>
+                      {/* FIX: pass p directly, id extracted in modal confirm */}
                       <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(p)}>🗑️</button>
                     </div>
                   </td>
@@ -248,7 +250,8 @@ export default function AdminProducts() {
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn btn-danger" onClick={() => handleDelete(deleteConfirm._id)}>Delete</button>
+              {/* FIX: use deleteConfirm.id instead of deleteConfirm._id */}
+              <button className="btn btn-danger" onClick={() => handleDelete(deleteConfirm.id)}>Delete</button>
             </div>
           </div>
         </div>
