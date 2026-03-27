@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API = axios.create({ baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080/api' });
+baseURL: process.env.REACT_APP_API_URL || 'https://electrostock-backend-rz0q.onrender.com/api'
 
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
