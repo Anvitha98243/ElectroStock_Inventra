@@ -12,15 +12,15 @@ public class StockRequest {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product.id", nullable = false)
+    @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "staff.id", nullable = false)
+    @JoinColumn(name = "staff_id", nullable = false)
     private User staff;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "admin.id", nullable = false)
+    @JoinColumn(name = "admin_id", nullable = false)
     private User admin;
 
     @Column(nullable = false)
