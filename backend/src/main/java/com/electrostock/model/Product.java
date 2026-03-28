@@ -36,7 +36,7 @@ public class Product {
     private String location;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "admin_id", nullable = false)
+    @JoinColumn(name = "admin.id", nullable = false)
     private User admin;
 
     @Column(name = "created_at")

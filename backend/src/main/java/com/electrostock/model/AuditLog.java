@@ -21,7 +21,7 @@ public class AuditLog {
     @Column(name = "target_model")
     private String targetModel;
 
-    @Column(name = "target_id")
+    @Column(name = "target.id")
     private Long targetId;
 
     @Column(columnDefinition = "TEXT")
