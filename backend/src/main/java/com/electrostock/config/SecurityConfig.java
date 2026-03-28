@@ -45,9 +45,9 @@ public class SecurityConfig {
                 "http://localhost:3000",
                 "http://localhost:8080",
                 "https://electro-stock-inventra.vercel.app",
-                "https://electro-stock-inventra-git-main-anvitha98243s-projects.vercel.app",
-                "https://electro-stock-inventra-r662.vercel.app" // ← added
-        ));
+                "https://electro-stock-inventra-r662.vercel.app",
+                "https://electro-stock-inventra-r662-git-main-anvitha98243s-projects.vercel.app",
+                "https://electro-stock-inventra-r662-l1bjq0gsi-anvitha98243s-projects.vercel.app"));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setExposedHeaders(List.of("Authorization"));
