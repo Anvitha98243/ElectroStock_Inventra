@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({ 
-  baseURL: process.env.REACT_APP_API_URL || 'https://electrostock-backend-rz0q.onrender.com/api/'
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080/api/'  // ← fixed fallback
 });
 
 API.interceptors.request.use((config) => {
@@ -23,3 +23,13 @@ API.interceptors.response.use(
 );
 
 export default API;
+```
+
+---
+
+## Don't forget — Vercel Environment Variable
+
+Go to **Vercel → Your Project → Settings → Environment Variables** and add:
+```
+Name:   REACT_APP_API_URL
+Value:  https://electrostock-backend-rz0q.onrender.com/api/
