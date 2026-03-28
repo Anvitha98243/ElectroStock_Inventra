@@ -43,9 +43,11 @@ public class SecurityConfig {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "http://localhost:8080", // ← added for local dev
+                "http://localhost:8080",
                 "https://electro-stock-inventra.vercel.app",
-                "https://electro-stock-inventra-git-main-anvitha98243s-projects.vercel.app"));
+                "https://electro-stock-inventra-git-main-anvitha98243s-projects.vercel.app",
+                "https://electro-stock-inventra-r662.vercel.app" // ← added
+        ));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setExposedHeaders(List.of("Authorization"));
