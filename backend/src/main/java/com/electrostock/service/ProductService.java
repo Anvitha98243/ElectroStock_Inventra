@@ -20,6 +20,8 @@ public class ProductService {
     private AuditLogRepository auditLogRepository;
     @Autowired
     private StockRequestRepository stockRequestRepository;
+    @Autowired
+    private EmailService emailService;
 
     private User getAdmin(String username) {
         return userRepository.findByUsername(username)
@@ -44,6 +46,22 @@ public class ProductService {
         m.put("createdAt", p.getCreatedAt());
         m.put("updatedAt", p.getUpdatedAt());
         return m;
+    }
+
+    // helper: build a single-product alert list and send email
+    private void checkAndSendLowStockAlert(User admin, Product p) {
+        if (p.isLowStock()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("name", p.getName());
+            item.put("sku", p.getSku());
+            item.put("category", p.getCategory());
+            item.put("quantity", p.getQuantity());
+            item.put("minThreshold", p.getMinThreshold());
+            emailService.sendLowStockAlertEmail(
+                    admin.getEmail(),
+                    admin.getUsername(),
+                    List.of(item));
+        }
     }
 
     public List<Map<String, Object>> getAllByAdmin(String username) {
@@ -99,6 +117,9 @@ public class ProductService {
         log.setDetails("{\"name\":\"" + p.getName() + "\",\"sku\":\"" + p.getSku() + "\"}");
         auditLogRepository.save(log);
 
+        // send low stock alert email if newly created product is already low
+        checkAndSendLowStockAlert(admin, p);
+
         return toMap(p);
     }
 
@@ -139,6 +160,9 @@ public class ProductService {
         log.setDetails("{\"name\":\"" + p.getName() + "\"}");
         auditLogRepository.save(log);
 
+        // send low stock alert email if updated product is now low
+        checkAndSendLowStockAlert(admin, p);
+
         return toMap(p);
     }
 
@@ -150,7 +174,6 @@ public class ProductService {
         if (!p.getAdmin().getId().equals(admin.getId()))
             throw new RuntimeException("Access denied");
 
-        // Log before deletion
         AuditLog log = new AuditLog();
         log.setAction("PRODUCT_DELETED");
         log.setPerformedBy(admin);
@@ -159,7 +182,6 @@ public class ProductService {
         log.setDetails("{\"name\":\"" + p.getName() + "\",\"sku\":\"" + p.getSku() + "\"}");
         auditLogRepository.save(log);
 
-        // Delete related stock requests first to satisfy FK constraint
         List<StockRequest> relatedRequests = stockRequestRepository.findByProduct(p);
         stockRequestRepository.deleteAll(relatedRequests);
 

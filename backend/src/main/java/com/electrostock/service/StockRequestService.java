@@ -12,10 +12,16 @@ import java.util.*;
 @Service
 public class StockRequestService {
 
-    @Autowired private StockRequestRepository requestRepository;
-    @Autowired private ProductRepository productRepository;
-    @Autowired private UserRepository userRepository;
-    @Autowired private AuditLogRepository auditLogRepository;
+    @Autowired
+    private StockRequestRepository requestRepository;
+    @Autowired
+    private ProductRepository productRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private AuditLogRepository auditLogRepository;
+    @Autowired
+    private EmailService emailService;
 
     private Map<String, Object> toMap(StockRequest r) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -45,10 +51,10 @@ public class StockRequestService {
             m.put("staff", staff);
         }
         if (r.getAdmin() != null) {
-            Map<String, Object> admin = new LinkedHashMap<>();
-            admin.put("id", r.getAdmin().getId());
-            admin.put("username", r.getAdmin().getUsername());
-            m.put("admin", admin);
+            Map<String, Object> adminMap = new LinkedHashMap<>();
+            adminMap.put("id", r.getAdmin().getId());
+            adminMap.put("username", r.getAdmin().getUsername());
+            m.put("admin", adminMap);
         }
         return m;
     }
@@ -125,6 +131,20 @@ public class StockRequestService {
             }
             product.setUpdatedAt(LocalDateTime.now());
             productRepository.save(product);
+
+            // send low stock alert if stock dropped below threshold after approval
+            if (product.isLowStock()) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("name", product.getName());
+                item.put("sku", product.getSku());
+                item.put("category", product.getCategory());
+                item.put("quantity", product.getQuantity());
+                item.put("minThreshold", product.getMinThreshold());
+                emailService.sendLowStockAlertEmail(
+                        admin.getEmail(),
+                        admin.getUsername(),
+                        List.of(item));
+            }
         }
 
         requestRepository.save(req);
