@@ -22,6 +22,10 @@ public class StockRequestService {
     private AuditLogRepository auditLogRepository;
     @Autowired
     private EmailService emailService;
+    @Autowired
+    private NotificationService notificationService;
+    @Autowired
+    private WhatsAppService whatsAppService;
 
     private Map<String, Object> toMap(StockRequest r) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -82,6 +86,22 @@ public class StockRequestService {
         req.setReason((String) body.getOrDefault("reason", ""));
         requestRepository.save(req);
 
+        // ── Notify admin of new request ───────────────────────────────────────
+        notificationService.create(admin,
+                "New Stock Request",
+                staff.getUsername() + " requested " + quantity + " units of "
+                        + product.getName() + " (" + type + ")",
+                "stock_request");
+
+        // ── WhatsApp alert to admin ───────────────────────────────────────────
+        whatsAppService.sendNewRequestAlert(
+                admin.getPhone(),
+                admin.getUsername(),
+                staff.getUsername(),
+                product.getName(),
+                quantity,
+                type);
+
         AuditLog log = new AuditLog();
         log.setAction("STOCK_REQUEST_CREATED");
         log.setPerformedBy(staff);
@@ -108,7 +128,8 @@ public class StockRequestService {
     }
 
     @Transactional
-    public Map<String, Object> resolve(String adminUsername, Long id, String status, String adminNote) {
+    public Map<String, Object> resolve(String adminUsername, Long id,
+            String status, String adminNote) {
         User admin = userRepository.findByUsername(adminUsername)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         StockRequest req = requestRepository.findByIdAndAdmin(id, admin)
@@ -132,7 +153,7 @@ public class StockRequestService {
             product.setUpdatedAt(LocalDateTime.now());
             productRepository.save(product);
 
-            // send low stock alert if stock dropped below threshold after approval
+            // ── Low stock alert after approval ────────────────────────────────
             if (product.isLowStock()) {
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("name", product.getName());
@@ -141,20 +162,67 @@ public class StockRequestService {
                 item.put("quantity", product.getQuantity());
                 item.put("minThreshold", product.getMinThreshold());
                 emailService.sendLowStockAlertEmail(
-                        admin.getEmail(),
+                        admin.getEmail(), admin.getUsername(), List.of(item));
+
+                // WhatsApp low stock alert
+                whatsAppService.sendLowStockAlert(
+                        admin.getPhone(),
                         admin.getUsername(),
-                        List.of(item));
+                        product.getName(),
+                        product.getQuantity(),
+                        product.getMinThreshold());
+
+                // In-app notification
+                notificationService.create(admin,
+                        "Low Stock Alert",
+                        product.getName() + " is low (" + product.getQuantity()
+                                + " units left, min: " + product.getMinThreshold() + ")",
+                        "low_stock");
             }
         }
 
         requestRepository.save(req);
 
+        // ── Notify staff of resolution ────────────────────────────────────────
+        User staff = req.getStaff();
+        String notifTitle = "approved".equals(status)
+                ? "Request Approved ✅"
+                : "Request Rejected ❌";
+        String notifMsg = "Your " + req.getType() + " request for "
+                + req.getProduct().getName() + " (" + req.getQuantity() + " units) was "
+                + status
+                + (adminNote != null && !adminNote.isBlank() ? ". Note: " + adminNote : "");
+
+        notificationService.create(staff, notifTitle, notifMsg,
+                "approved".equals(status) ? "request_approved" : "request_rejected");
+
+        // ── WhatsApp alert to staff ───────────────────────────────────────────
+        if ("approved".equals(status)) {
+            whatsAppService.sendRequestApprovedAlert(
+                    staff.getPhone(),
+                    staff.getUsername(),
+                    req.getProduct().getName(),
+                    req.getQuantity(),
+                    req.getType());
+        } else {
+            whatsAppService.sendRequestRejectedAlert(
+                    staff.getPhone(),
+                    staff.getUsername(),
+                    req.getProduct().getName(),
+                    req.getQuantity(),
+                    req.getType(),
+                    adminNote);
+        }
+
         AuditLog log = new AuditLog();
-        log.setAction("approved".equals(status) ? "STOCK_REQUEST_APPROVED" : "STOCK_REQUEST_REJECTED");
+        log.setAction("approved".equals(status)
+                ? "STOCK_REQUEST_APPROVED"
+                : "STOCK_REQUEST_REJECTED");
         log.setPerformedBy(admin);
         log.setTargetModel("StockRequest");
         log.setTargetId(req.getId());
-        log.setDetails("{\"type\":\"" + req.getType() + "\",\"quantity\":" + req.getQuantity() + "}");
+        log.setDetails("{\"type\":\"" + req.getType()
+                + "\",\"quantity\":" + req.getQuantity() + "}");
         auditLogRepository.save(log);
 
         return toMap(req);

@@ -22,6 +22,10 @@ public class ProductService {
     private StockRequestRepository stockRequestRepository;
     @Autowired
     private EmailService emailService;
+    @Autowired
+    private NotificationService notificationService;
+    @Autowired
+    private WhatsAppService whatsAppService;
 
     private User getAdmin(String username) {
         return userRepository.findByUsername(username)
@@ -48,7 +52,6 @@ public class ProductService {
         return m;
     }
 
-    // helper: build a single-product alert list and send email
     private void checkAndSendLowStockAlert(User admin, Product p) {
         if (p.isLowStock()) {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -58,9 +61,20 @@ public class ProductService {
             item.put("quantity", p.getQuantity());
             item.put("minThreshold", p.getMinThreshold());
             emailService.sendLowStockAlertEmail(
-                    admin.getEmail(),
+                    admin.getEmail(), admin.getUsername(), List.of(item));
+
+            notificationService.create(admin,
+                    "Low Stock Alert",
+                    p.getName() + " is low (" + p.getQuantity()
+                            + " units, min: " + p.getMinThreshold() + ")",
+                    "low_stock");
+
+            whatsAppService.sendLowStockAlert(
+                    admin.getPhone(),
                     admin.getUsername(),
-                    List.of(item));
+                    p.getName(),
+                    p.getQuantity(),
+                    p.getMinThreshold());
         }
     }
 
@@ -101,8 +115,12 @@ public class ProductService {
         p.setSku(sku);
         p.setCategory((String) body.get("category"));
         p.setDescription((String) body.getOrDefault("description", ""));
-        p.setQuantity(body.get("quantity") != null ? ((Number) body.get("quantity")).intValue() : 0);
-        p.setMinThreshold(body.get("minThreshold") != null ? ((Number) body.get("minThreshold")).intValue() : 10);
+        p.setQuantity(body.get("quantity") != null
+                ? ((Number) body.get("quantity")).intValue()
+                : 0);
+        p.setMinThreshold(body.get("minThreshold") != null
+                ? ((Number) body.get("minThreshold")).intValue()
+                : 10);
         p.setPrice(((Number) body.get("price")).doubleValue());
         p.setSupplier((String) body.getOrDefault("supplier", ""));
         p.setLocation((String) body.getOrDefault("location", ""));
@@ -117,9 +135,7 @@ public class ProductService {
         log.setDetails("{\"name\":\"" + p.getName() + "\",\"sku\":\"" + p.getSku() + "\"}");
         auditLogRepository.save(log);
 
-        // send low stock alert email if newly created product is already low
         checkAndSendLowStockAlert(admin, p);
-
         return toMap(p);
     }
 
@@ -160,9 +176,7 @@ public class ProductService {
         log.setDetails("{\"name\":\"" + p.getName() + "\"}");
         auditLogRepository.save(log);
 
-        // send low stock alert email if updated product is now low
         checkAndSendLowStockAlert(admin, p);
-
         return toMap(p);
     }
 
@@ -182,9 +196,8 @@ public class ProductService {
         log.setDetails("{\"name\":\"" + p.getName() + "\",\"sku\":\"" + p.getSku() + "\"}");
         auditLogRepository.save(log);
 
-        List<StockRequest> relatedRequests = stockRequestRepository.findByProduct(p);
-        stockRequestRepository.deleteAll(relatedRequests);
-
+        List<StockRequest> related = stockRequestRepository.findByProduct(p);
+        stockRequestRepository.deleteAll(related);
         productRepository.delete(p);
         return Map.of("message", "Product deleted successfully");
     }

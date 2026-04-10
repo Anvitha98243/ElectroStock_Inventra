@@ -24,6 +24,10 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    // phone number for WhatsApp alerts e.g. +919876543210
+    @Column(name = "phone")
+    private String phone;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -72,6 +76,14 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
     }
 
     public LocalDateTime getCreatedAt() {

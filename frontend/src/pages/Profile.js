@@ -112,7 +112,8 @@ export default function Profile() {
               { label: 'Username', value: user?.username, icon: '👤' },
               { label: 'Email Address', value: user?.email, icon: '📧' },
               { label: 'Role', value: user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1), icon: '🛡️' },
-              { label: 'User ID', value: user?.id, icon: '🔑', mono: true },
+             { label: 'User ID', value: user?.id, icon: '🔑', mono: true },
+{ label: 'Phone (WhatsApp)', value: user?.phone || 'Not set — add in settings', icon: '📱' },
             ].map(({ label, value, icon, mono }) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#f8fafc', borderRadius: 8 }}>
                 <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
