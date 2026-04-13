@@ -1,14 +1,112 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import API from '../../utils/api';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import QRCode from 'react-qr-code';
 
 const CATEGORIES = ['Components', 'Consumer Electronics', 'Spare Parts', 'Accessories', 'Other'];
 
 const emptyForm = { name: '', sku: '', category: 'Components', description: '', quantity: '', minThreshold: '10', price: '', supplier: '', location: '' };
 
+// ── QR Modal ────────────────────────────────────────────────────────────────
+function QRModal({ product, onClose }) {
+  const qrRef = useRef(null);
+
+  // QR payload: everything staff needs to auto-fill the request form
+  const qrPayload = JSON.stringify({
+    productId: product.id,
+    adminId:   product.adminId,
+    adminUsername: product.adminUsername,
+    productName: product.name,
+    sku:       product.sku,
+    category:  product.category,
+    price:     product.price,
+    quantity:  product.quantity,
+    minThreshold: product.minThreshold,
+  });
+
+  const handleDownload = () => {
+    // Get the SVG element and convert to downloadable PNG via canvas
+    const svg = qrRef.current?.querySelector('svg');
+    if (!svg) return;
+
+    const serializer = new XMLSerializer();
+    const svgStr = serializer.serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    const size = 300;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+      ctx.drawImage(img, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      const link = document.createElement('a');
+      link.download = `QR-${product.sku}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast.success('QR code downloaded!');
+    };
+    img.src = url;
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 400, textAlign: 'center' }}>
+        <div className="modal-header">
+          <div className="modal-title">📱 Product QR Code</div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Product info */}
+        <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 16px', marginBottom: 20, textAlign: 'left' }}>
+          <div style={{ fontWeight: 600, fontSize: 15, color: '#111827' }}>{product.name}</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
+            SKU: <code style={{ background: '#f3f4f6', padding: '1px 5px', borderRadius: 4 }}>{product.sku}</code>
+            {' · '}{product.category}
+          </div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
+            Stock: <strong style={{ color: product.quantity < product.minThreshold ? '#dc2626' : '#16a34a' }}>{product.quantity}</strong>
+            {' · '}Admin: <strong>{product.adminUsername}</strong>
+          </div>
+        </div>
+
+        {/* QR Code */}
+        <div ref={qrRef} style={{
+          display: 'inline-flex', padding: 20,
+          background: '#fff', borderRadius: 16,
+          border: '2px solid #e5e7eb',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          marginBottom: 16
+        }}>
+          <QRCode
+            value={qrPayload}
+            size={200}
+            level="M"
+            style={{ display: 'block' }}
+          />
+        </div>
+
+        <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 20, lineHeight: 1.6 }}>
+          Staff can scan this QR code with their phone camera to instantly auto-fill the stock request form — no manual search needed.
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button className="btn btn-outline" onClick={onClose}>Close</button>
+          <button className="btn btn-primary" onClick={handleDownload}>⬇️ Download PNG</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ───────────────────────────────────────────────────────────
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +118,7 @@ export default function AdminProducts() {
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [qrProduct, setQrProduct] = useState(null); // ← NEW: QR modal state
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -47,7 +146,6 @@ export default function AdminProducts() {
     try {
       const payload = { ...form, quantity: Number(form.quantity) || 0, minThreshold: Number(form.minThreshold) || 10, price: Number(form.price) };
       if (editProduct) {
-        // FIX: use editProduct.id instead of editProduct._id
         await API.put(`/products/${editProduct.id}`, payload);
         toast.success('Product updated');
       } else {
@@ -166,8 +264,15 @@ export default function AdminProducts() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
+                      {/* ── NEW: QR Code button ── */}
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setQrProduct(p)}
+                        title="View QR Code"
+                      >
+                        📱 QR
+                      </button>
                       <button className="btn btn-outline btn-sm" onClick={() => openEdit(p)}>✏️ Edit</button>
-                      {/* FIX: pass p directly, id extracted in modal confirm */}
                       <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(p)}>🗑️</button>
                     </div>
                   </td>
@@ -178,7 +283,12 @@ export default function AdminProducts() {
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* ── QR Code Modal (NEW) ── */}
+      {qrProduct && (
+        <QRModal product={qrProduct} onClose={() => setQrProduct(null)} />
+      )}
+
+      {/* Add/Edit Modal — unchanged */}
       {showModal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal">
@@ -237,7 +347,7 @@ export default function AdminProducts() {
         </div>
       )}
 
-      {/* Delete Confirm Modal */}
+      {/* Delete Confirm Modal — unchanged */}
       {deleteConfirm && (
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 380 }}>
@@ -250,7 +360,6 @@ export default function AdminProducts() {
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              {/* FIX: use deleteConfirm.id instead of deleteConfirm._id */}
               <button className="btn btn-danger" onClick={() => handleDelete(deleteConfirm.id)}>Delete</button>
             </div>
           </div>

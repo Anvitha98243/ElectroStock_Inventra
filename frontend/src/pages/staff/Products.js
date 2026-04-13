@@ -1,31 +1,172 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import API from '../../utils/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 
+// ── QR Scanner Modal ─────────────────────────────────────────────────────────
+// Uses html5-qrcode loaded dynamically to avoid SSR issues.
+// We load it once, start the camera, parse the QR payload, then stop cleanly.
+function QRScannerModal({ onScan, onClose }) {
+  const scannerRef  = useRef(null);   // html5-qrcode instance
+  const divId       = 'qr-reader-el'; // stable DOM id
+  const [status, setStatus]   = useState('starting'); // starting | scanning | error
+  const [errMsg, setErrMsg]   = useState('');
+  const startedRef  = useRef(false);  // guard against double-start (StrictMode)
+
+  useEffect(() => {
+    let html5QrCode = null;
+
+    const startScanner = async () => {
+      if (startedRef.current) return;
+      startedRef.current = true;
+
+      try {
+        // Dynamic import — only loads the lib when the modal opens
+        const { Html5Qrcode } = await import('html5-qrcode');
+        html5QrCode = new Html5Qrcode(divId);
+        scannerRef.current = html5QrCode;
+
+        await html5QrCode.start(
+          { facingMode: 'environment' }, // rear camera on phones
+          { fps: 10, qrbox: { width: 240, height: 240 } },
+          (decodedText) => {
+            // ── Success ──────────────────────────────────────────────────────
+            stopScanner(html5QrCode);
+            try {
+              const data = JSON.parse(decodedText);
+              // Validate it's one of our product QR codes
+              if (!data.productId || !data.adminId) throw new Error('Not a valid product QR');
+              onScan(data);
+            } catch {
+              toast.error('Invalid QR code — not an ElectroStock product QR');
+              onClose();
+            }
+          },
+          () => { /* ignore per-frame decode failures */ }
+        );
+
+        setStatus('scanning');
+      } catch (err) {
+        const msg = err?.message || String(err);
+        // Camera permission denied or not available
+        if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('notallowed')) {
+          setErrMsg('Camera permission denied. Please allow camera access and try again.');
+        } else if (msg.toLowerCase().includes('notfound') || msg.toLowerCase().includes('no camera')) {
+          setErrMsg('No camera found on this device.');
+        } else {
+          setErrMsg('Could not start camera: ' + msg);
+        }
+        setStatus('error');
+      }
+    };
+
+    const stopScanner = async (instance) => {
+      try {
+        if (instance && instance.isScanning) {
+          await instance.stop();
+          instance.clear();
+        }
+      } catch { /* ignore stop errors */ }
+    };
+
+    startScanner();
+
+    // Cleanup when modal unmounts
+    return () => {
+      if (scannerRef.current) {
+        stopScanner(scannerRef.current);
+        scannerRef.current = null;
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 420, textAlign: 'center' }}>
+        <div className="modal-header">
+          <div className="modal-title">📷 Scan Product QR Code</div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {status === 'starting' && (
+          <div style={{ padding: '32px 0', color: '#6b7280' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>📷</div>
+            <div>Starting camera...</div>
+          </div>
+        )}
+
+        {status === 'error' && (
+          <div style={{ padding: '24px 0' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
+            <div className="alert alert-danger" style={{ textAlign: 'left' }}>{errMsg}</div>
+            <button className="btn btn-outline" onClick={onClose}>Close</button>
+          </div>
+        )}
+
+        {/* Camera viewfinder — always rendered so html5-qrcode can attach to it */}
+        <div style={{ display: status === 'error' ? 'none' : 'block' }}>
+          {/* html5-qrcode mounts the video inside this div */}
+          <div
+            id={divId}
+            style={{ width: '100%', borderRadius: 10, overflow: 'hidden' }}
+          />
+
+          {status === 'scanning' && (
+            <div style={{ marginTop: 16, fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
+              Point your camera at a product QR code.
+              <br />The form will auto-fill instantly on a successful scan.
+            </div>
+          )}
+
+          <button
+            className="btn btn-outline"
+            onClick={onClose}
+            style={{ marginTop: 16 }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function StaffProducts() {
   const { user } = useAuth();
-  const [adminSearch, setAdminSearch] = useState('');
-  const [foundAdmin, setFoundAdmin] = useState(null);
-  const [products, setProducts] = useState([]);
+  const [adminSearch, setAdminSearch]     = useState('');
+  const [foundAdmin, setFoundAdmin]       = useState(null);
+  const [products, setProducts]           = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [productSearch, setProductSearch] = useState('');
-  const [filterCat, setFilterCat] = useState('');
-  const [requestModal, setRequestModal] = useState(null);
-  const [reqForm, setReqForm] = useState({ type: 'stock-in', quantity: '', reason: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState('');
+  const [filterCat, setFilterCat]         = useState('');
+  const [requestModal, setRequestModal]   = useState(null);
+  const [reqForm, setReqForm]             = useState({ type: 'stock-in', quantity: '', reason: '' });
+  const [submitting, setSubmitting]       = useState(false);
+  const [formError, setFormError]         = useState('');
+  const [showScanner, setShowScanner]     = useState(false); // ← NEW
 
+  // ── Load admin + products by id (used after QR scan too) ─────────────────
+  const loadAdminProducts = async (adminId, adminData) => {
+    try {
+      const pRes = await API.get(`/products/by-admin/${adminId}`);
+      setFoundAdmin(adminData);
+      setProducts(pRes.data);
+      return pRes.data;
+    } catch {
+      toast.error('Failed to load products for admin');
+      return [];
+    }
+  };
+
+  // ── Manual admin search (unchanged) ──────────────────────────────────────
   const searchAdmin = async () => {
     if (!adminSearch.trim()) { toast.error('Enter admin username'); return; }
     setSearchLoading(true);
     setFoundAdmin(null); setProducts([]);
     try {
       const res = await API.get(`/auth/search-admin?username=${adminSearch.trim()}`);
-      setFoundAdmin(res.data);
-      // FIX: use res.data.id instead of res.data._id
-      const pRes = await API.get(`/products/by-admin/${res.data.id}`);
-      setProducts(pRes.data);
+      await loadAdminProducts(res.data.id, res.data);
       toast.success(`Found admin: ${res.data.username}`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Admin not found');
@@ -33,6 +174,46 @@ export default function StaffProducts() {
     } finally { setSearchLoading(false); }
   };
 
+  // ── QR scan handler ───────────────────────────────────────────────────────
+  const handleQRScan = async (data) => {
+    setShowScanner(false);
+    toast.loading('Loading product details...', { id: 'qr-load' });
+
+    try {
+      // 1. Load admin info by id
+      let adminData = foundAdmin;
+      if (!adminData || adminData.id !== data.adminId) {
+        // Fetch admin via search — we use the adminUsername from QR payload
+        const adminRes = await API.get(`/auth/search-admin?username=${data.adminUsername}`);
+        adminData = adminRes.data;
+        setAdminSearch(data.adminUsername);
+      }
+
+      // 2. Load products for that admin (if not already loaded for same admin)
+      let productList = products;
+      if (!foundAdmin || foundAdmin.id !== adminData.id) {
+        productList = await loadAdminProducts(adminData.id, adminData);
+      }
+
+      // 3. Find the exact product in the list (fresh from server = accurate stock)
+      const product = productList.find(p => p.id === data.productId);
+      if (!product) {
+        toast.error('Product not found in inventory. It may have been deleted.', { id: 'qr-load' });
+        return;
+      }
+
+      toast.success(`✅ Scanned: ${product.name}`, { id: 'qr-load' });
+
+      // 4. Auto-open the request modal with this product
+      setRequestModal(product);
+      setReqForm({ type: 'stock-in', quantity: '', reason: '' });
+      setFormError('');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load scanned product', { id: 'qr-load' });
+    }
+  };
+
+  // ── Request submit (unchanged) ────────────────────────────────────────────
   const openRequest = (product) => {
     setRequestModal(product);
     setReqForm({ type: 'stock-in', quantity: '', reason: '' });
@@ -49,12 +230,11 @@ export default function StaffProducts() {
     setSubmitting(true);
     try {
       await API.post('/requests', {
-        // FIX: use .id instead of ._id for both productId and adminId
         productId: requestModal.id,
-        adminId: foundAdmin.id,
-        type: reqForm.type,
-        quantity: Number(reqForm.quantity),
-        reason: reqForm.reason
+        adminId:   foundAdmin.id,
+        type:      reqForm.type,
+        quantity:  Number(reqForm.quantity),
+        reason:    reqForm.reason,
       });
       toast.success('Request submitted successfully!');
       setRequestModal(null);
@@ -77,9 +257,36 @@ export default function StaffProducts() {
           <div className="page-title">🔍 Browse Products</div>
           <div className="page-subtitle">Search for an admin to view and request their inventory</div>
         </div>
+        {/* ── NEW: Scan QR button in header ── */}
+        <button
+          className="btn btn-primary"
+          onClick={() => setShowScanner(true)}
+          title="Scan a product QR code to instantly open its request form"
+        >
+          📷 Scan QR Code
+        </button>
       </div>
 
-      {/* Admin Search */}
+      {/* ── NEW: QR tip banner ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #eff6ff, #f0fdf4)',
+        border: '1px solid #bfdbfe',
+        borderRadius: 10,
+        padding: '12px 18px',
+        marginBottom: 20,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        fontSize: 13,
+        color: '#1e40af',
+      }}>
+        <span style={{ fontSize: 22, flexShrink: 0 }}>📱</span>
+        <span>
+          <strong>Quick tip:</strong> Click <strong>"Scan QR Code"</strong> and point your camera at any product QR code to instantly jump to its request form — no manual searching needed!
+        </span>
+      </div>
+
+      {/* Admin Search — unchanged */}
       <div className="card" style={{ marginBottom: 24 }}>
         <h3 style={{ fontWeight: 600, fontSize: 15, marginBottom: 14 }}>🛡️ Find Admin</h3>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -103,7 +310,7 @@ export default function StaffProducts() {
         )}
       </div>
 
-      {/* Products */}
+      {/* Products table — unchanged */}
       {foundAdmin && (
         <>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -153,7 +360,15 @@ export default function StaffProducts() {
         </>
       )}
 
-      {/* Request Modal */}
+      {/* ── NEW: QR Scanner Modal ── */}
+      {showScanner && (
+        <QRScannerModal
+          onScan={handleQRScan}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
+
+      {/* Request Modal — unchanged */}
       {requestModal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setRequestModal(null)}>
           <div className="modal">
